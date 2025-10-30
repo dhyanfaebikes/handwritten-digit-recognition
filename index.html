@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Handwritten Digit Recognition</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+    }
+    .canvas-container {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+    #canvas {
+      border: 2px solid #333;
+      background: black;
+      cursor: crosshair;
+    }
+    .controls {
+      text-align: center;
+      margin: 20px 0;
+    }
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin: 0 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    .result {
+      text-align: center;
+      margin: 20px 0;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .loading {
+      text-align: center;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Handwritten Digit Recognition</h1>
+    <div class="loading" id="loading">Loading TensorFlow.js model...</div>
+    
+    <div id="app" style="display: none;">
+      <div class="canvas-container">
+        <canvas id="canvas" width="280" height="280"></canvas>
+      </div>
+      
+      <div class="controls">
+        <button id="clearBtn">Clear</button>
+        <button id="predictBtn">Predict</button>
+      </div>
+      
+      <div class="result" id="result">
+        Draw a digit and click Predict
+      </div>
+      
+      <div class="chart-container" style="margin: 20px 0; text-align: center;">
+        <canvas id="predictionChart" width="400" height="200"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@latest"></script>
+  <script>
+    let model;
+    let canvas, ctx;
+    let isDrawing = false;
+    let predictionChart;
+    let localModel = true;
+
+    let localPythonModelPath = '/Users/dhyan/Personal/handwritten-js-2/train/output/mnist_cnn.h5';
+
+    // Initialize canvas
+    function initCanvas() {
+      canvas = document.getElementById('canvas');
+      ctx = canvas.getContext('2d', { willReadFrequently: true });
+      
+      // Set canvas properties
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 20;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // Mouse events
+      canvas.addEventListener('mousedown', startDrawing);
+      canvas.addEventListener('mousemove', draw);
+      canvas.addEventListener('mouseup', stopDrawing);
+      canvas.addEventListener('mouseout', stopDrawing);
+      
+      // Touch events
+      canvas.addEventListener('touchstart', handleTouch);
+      canvas.addEventListener('touchmove', handleTouch);
+      canvas.addEventListener('touchend', stopDrawing);
+    }
+
+    function startDrawing(e) {
+      isDrawing = true;
+      draw(e);
+    }
+
+    function draw(e) {
+      if (!isDrawing) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+
+    function stopDrawing() {
+      if (isDrawing) {
+        isDrawing = false;
+        ctx.beginPath();
+      }
+    }
+
+    function handleTouch(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const mouseEvent = new MouseEvent(e.type === 'touchstart' ? 'mousedown' : 
+                                       e.type === 'touchmove' ? 'mousemove' : 'mouseup', {
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      canvas.dispatchEvent(mouseEvent);
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      document.getElementById('result').textContent = 'Draw a digit and click Predict';
+      
+      // Reset chart to zeros
+      if (predictionChart) {
+        predictionChart.data.datasets[0].data = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        predictionChart.update('active');
+      }
+    }
+
+    async function loadModel() {
+      try {
+        // Load the actual MNIST CNN model
+        model = await tf.loadLayersModel('public/classifiers/model.json');
+        console.log('MNIST CNN model loaded successfully');
+      } catch (error) {
+        console.log('MNIST model not found, using fallback...');
+        // Fallback: create a simple model for demonstration
+        model = createSimpleModel();
+      }
+    }
+
+    function createSimpleModel() {
+      // Create a simple model for demonstration that matches MNIST input shape
+      const model = tf.sequential({
+        layers: [
+          tf.layers.flatten({inputShape: [28, 28, 1]}),
+          tf.layers.dense({units: 128, activation: 'relu'}),
+          tf.layers.dropout({rate: 0.2}),
+          tf.layers.dense({units: 10, activation: 'softmax'})
+        ]
+      });
+      return model;
+    }
+
+    function initChart() {
+      try {
+        const ctx = document.getElementById('predictionChart').getContext('2d');
+        predictionChart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+            datasets: [{
+              label: 'Prediction Confidence',
+              data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+              backgroundColor: 'rgba(54, 162, 235, 0.6)',
+              borderColor: 'rgba(54, 162, 235, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            animation: {
+              duration: 500
+            },
+            scales: {
+              y: {
+                beginAtZero: true,
+                max: 1.0,
+                title: {
+                  display: true,
+                  text: 'Confidence'
+                }
+              },
+              x: {
+                title: {
+                  display: true,
+                  text: 'Digit'
+                }
+              }
+            },
+            plugins: {
+              title: {
+                display: true,
+                text: 'MNIST CNN Prediction'
+              }
+            }
+          }
+        });
+        console.log('Chart initialized successfully');
+      } catch (error) {
+        console.error('Error initializing chart:', error);
+      }
+    }
+
+    async function predict() {
+      if (!model) {
+        document.getElementById('result').textContent = 'Model not loaded yet';
+        return;
+      }
+
+      if (!predictionChart) {
+        console.error('Chart not initialized');
+        return;
+      }
+
+      console.log('Model loaded:', !!model);
+      console.log('Model input shape:', model.inputs[0].shape);
+
+      try {
+        // Get image data from canvas
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // Convert to tensor and preprocess for MNIST (28x28 grayscale)
+        let tensor = tf.browser.fromPixels(imageData, 1)
+          .resizeNearestNeighbor([28, 28])
+          .expandDims(0) // [1, 28, 28, 1]
+          .div(255.0);
+        
+        console.log('Tensor shape:', tensor.shape);
+
+        // Make prediction
+        console.log('Making prediction...');
+        const prediction = model.predict(tensor);
+        console.log('Prediction tensor shape:', prediction.shape);
+        const values = await prediction.data();
+        console.log('Raw prediction values:', values);
+        
+        // Find the digit with highest probability
+        const maxIndex = values.indexOf(Math.max(...values));
+        const confidence = (values[maxIndex] * 100).toFixed(1);
+        
+        // Update text result
+        document.getElementById('result').textContent = 
+          `Predicting you draw ${maxIndex} with ${confidence}% confidence`;
+        
+        // Update chart
+        console.log('Prediction values:', values);
+        const valuesArray = Array.from(values);
+        predictionChart.data.datasets[0].data = valuesArray;
+        predictionChart.update('active');
+        
+        // Clean up
+        tensor.dispose();
+        prediction.dispose();
+      } catch (error) {
+        console.error('Prediction error:', error);
+        console.error('Error details:', error.message);
+        console.error('Error stack:', error.stack);
+        document.getElementById('result').textContent = `Error: ${error.message}`;
+      }
+    }
+
+    // Initialize the app
+    async function init() {
+      initCanvas();
+      initChart();
+      
+      // Set up event listeners
+      document.getElementById('clearBtn').addEventListener('click', clearCanvas);
+      document.getElementById('predictBtn').addEventListener('click', predict);
+      
+      // Load model
+      await loadModel();
+      
+      // Show the app
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    }
+
+    // Start the app
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# Core ML stack
+tensorflow>=2.12,<3
+tensorflowjs>=4,<5
+
+# Numerics & plotting
+numpy>=1.23,<2
+matplotlib>=3.7,<4
+scikit-learn>=1.2,<2
+
+# Optional but commonly present
+# pillow>=9,<11

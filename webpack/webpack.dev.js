@@ -11,12 +11,17 @@ module.exports = merge.smartStrategy({
   mode: 'development',
   devtool: 'source-map',
   devServer: {
-    contentBase: [Utils.PUBLIC_DIR, path.resolve(Utils.ROOT_DIR, 'node_modules')],
-    overlay: {
-      warnings: false,
-      errors: true,
+    static: [
+      { directory: Utils.PUBLIC_DIR },
+      { directory: path.resolve(Utils.ROOT_DIR, 'node_modules') },
+    ],
+    client: {
+      overlay: {
+        warnings: false,
+        errors: true,
+      },
     },
-    port: 9000,
+    port: 5000,
   },
   module: {
     rules: [
