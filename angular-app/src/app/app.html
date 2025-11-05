@@ -1,0 +1,424 @@
+<div class="container">
+  <header class="header">
+    <h1>MNIST CNN Classifier</h1>
+    <div class="subtitle">Handwritten Digit Recognition</div>
+  </header>
+  
+  @if (isModelLoading()) {
+    <div class="loading">
+      <div class="loader"></div>
+      <div>Initializing TensorFlow model...</div>
+      <div class="loader-text">Loading weights from FastAPI server</div>
+    </div>
+  } @else {
+    <div class="app">
+      <div class="main-grid">
+        <!-- Left Panel: Input & Processing -->
+        <div class="left-panel">
+          <div class="panel-section">
+            <div class="section-title">Input Processing</div>
+            <div class="canvas-wrapper">
+              <app-drawing-canvas #drawingCanvas></app-drawing-canvas>
+            </div>
+            <div class="controls">
+              <button class="btn btn-secondary" (click)="handleClear()">Clear</button>
+              <button class="btn btn-primary" (click)="handlePredict()">Infer</button>
+            </div>
+          </div>
+
+          <!-- Preprocessed Input Visualization -->
+          <div class="panel-section">
+            <div class="section-title">
+              Preprocessed Tensor [1, 28, 28, 1]
+              <div class="tensor-explanation">
+                [batch=1, height=28px, width=28px, channels=1 grayscale]
+              </div>
+            </div>
+            <div class="tensor-visualization">
+              <div class="preprocessed-canvas-wrapper">
+                <canvas #preprocessedCanvas class="preprocessed-canvas"></canvas>
+              </div>
+              <div class="tensor-info">
+                <span>Shape: [1, 28, 28, 1]</span>
+                <span>Dtype: float32</span>
+                <span>Normalized: [0, 1]</span>
+                <span>Size: 784 params</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tensor Flow Through Network -->
+          @if (currentPrediction() && tensorStats()) {
+            <div class="panel-section">
+              <div class="section-title">Tensor Flow Through Network</div>
+              <div class="tensor-flow">
+                <div class="flow-step input-step">
+                  <div class="flow-header">
+                    <div class="flow-title">Input Image</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 28, 28, 1]</div>
+                    <div class="flow-explanation">1 image, 28×28 pixels, 1 grayscale channel</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.input.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.input.nonZero }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.input.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">P50</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.input.p50, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Entropy</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.input.entropy, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Convolution</div>
+                </div>
+
+                <div class="flow-step conv-step">
+                  <div class="flow-header">
+                    <div class="flow-title">Conv2D Layer 1</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 28, 28, 32]</div>
+                    <div class="flow-explanation">32 feature detectors scan for patterns (edges, curves)</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.conv1.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.conv1.nonZero | number }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.conv1.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top5</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.conv1.top5, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Sparsity</div>
+                          <div class="metric-value-large">{{ (tensorStats()!.conv1.sparsity * 100).toFixed(1) }}%</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Entropy</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.conv1.entropy, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Downsampling</div>
+                </div>
+
+                <div class="flow-step pool-step">
+                  <div class="flow-header">
+                    <div class="flow-title">MaxPool2D</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 14, 14, 32]</div>
+                    <div class="flow-explanation">Keep strongest features, reduce size by 2×</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.pool1.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.pool1.nonZero | number }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.pool1.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">P90</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.pool1.p90, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Range</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.pool1.range, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Deep Convolution</div>
+                </div>
+
+                <div class="flow-step conv-step">
+                  <div class="flow-header">
+                    <div class="flow-title">Conv2D Layer 2</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 14, 14, 64]</div>
+                    <div class="flow-explanation">64 filters detect complex patterns (digit shapes)</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.conv2.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.conv2.nonZero | number }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.conv2.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top5</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.conv2.top5, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Sparsity</div>
+                          <div class="metric-value-large">{{ (tensorStats()!.conv2.sparsity * 100).toFixed(1) }}%</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Entropy</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.conv2.entropy, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Downsampling</div>
+                </div>
+
+                <div class="flow-step pool-step">
+                  <div class="flow-header">
+                    <div class="flow-title">MaxPool2D</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 7, 7, 64]</div>
+                    <div class="flow-explanation">Further compression, highlight important features</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.pool2.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.pool2.nonZero | number }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.pool2.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">P90</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.pool2.p90, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Range</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.pool2.range, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Flattening</div>
+                </div>
+
+                <div class="flow-step flatten-step">
+                  <div class="flow-header">
+                    <div class="flow-title">Flatten</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 3136]</div>
+                    <div class="flow-explanation">Convert 2D feature maps into 1D vector</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.flatten.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.flatten.nonZero | number }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.flatten.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">P50</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.flatten.p50, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Range</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.flatten.range, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Full Connection</div>
+                </div>
+
+                <div class="flow-step dense-step">
+                  <div class="flow-header">
+                    <div class="flow-title">Dense Layer</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 256]</div>
+                    <div class="flow-explanation">256 neurons learn digit combinations</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.dense.count | number }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.dense.nonZero | number }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.dense.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top10</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.dense.top10, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Entropy</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.dense.entropy, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flow-connector">
+                  <div class="connector-line"></div>
+                  <div class="connector-label">Classification</div>
+                </div>
+
+                <div class="flow-step output-step">
+                  <div class="flow-header">
+                    <div class="flow-title">Output Layer</div>
+                  </div>
+                  <div class="flow-details">
+                    <div class="flow-shape">Shape: [1, 10]</div>
+                    <div class="flow-explanation">10 probabilities (one for each digit 0-9)</div>
+                    <div class="flow-stats">
+                      <div class="static-metrics">
+                        <span class="metric-label">Count:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.output.count }}</span>
+                        <span class="metric-label">Active:</span>
+                        <span class="metric-value-static">{{ tensorStats()!.output.nonZero }}</span>
+                      </div>
+                      <div class="dynamic-metrics">
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Top1</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.output.top1, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">P90</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.output.p90, 4) }}</div>
+                        </div>
+                        <div class="metric-item featured">
+                          <div class="metric-label-small">Entropy</div>
+                          <div class="metric-value-large">{{ formatDecimal(tensorStats()!.output.entropy, 4) }}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="flow-result">Predicted: {{ currentPrediction()!.digit }} ({{ (currentPrediction()!.confidence * 100).toFixed(1) }}%)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          }
+
+          <!-- Inference Pipeline -->
+          @if (isProcessing()) {
+            <div class="panel-section">
+              <div class="section-title">Inference Pipeline</div>
+              <div class="pipeline">
+                <div class="pipeline-step active">
+                  <div class="step-label">Input</div>
+                </div>
+                <div class="pipeline-step active">
+                  <div class="step-label">Conv2D</div>
+                </div>
+                <div class="pipeline-step active">
+                  <div class="step-label">Conv2D</div>
+                </div>
+                <div class="pipeline-step active">
+                  <div class="step-label">Dense</div>
+                </div>
+                <div class="pipeline-step active">
+                  <div class="step-label">Output</div>
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Right Panel: Results -->
+        <div class="right-panel">
+          @if (currentPrediction()) {
+            <div class="panel-section prediction-display">
+              <div class="predicted-digit">{{ currentPrediction()!.digit }}</div>
+              <div class="prediction-label">PREDICTED CLASS</div>
+              <div class="confidence-bar">
+                <div class="confidence-fill" [style.width.%]="currentPrediction()!.confidence * 100"></div>
+                <div class="confidence-text">{{ (currentPrediction()!.confidence * 100).toFixed(1) }}%</div>
+              </div>
+              <div class="prediction-stats">
+                <div class="stat-item">
+                  <span class="stat-label">Accuracy:</span>
+                  <span class="stat-value">{{ (currentPrediction()!.confidence * 100).toFixed(2) }}%</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">Inference Time:</span>
+                  <span class="stat-value">{{ inferenceTime() }}ms</span>
+                </div>
+              </div>
+            </div>
+          } @else {
+            <div class="panel-section placeholder">
+              <div class="placeholder-text">Ready for inference</div>
+              <div class="placeholder-subtitle">Draw a digit and click Infer</div>
+            </div>
+          }
+
+          <!-- Class Probabilities Chart -->
+          <div class="panel-section chart-section">
+            <div class="section-title">Softmax Output Distribution</div>
+            <div class="chart-container">
+              <app-confidence-chart [probabilities]="predictionProbabilities"></app-confidence-chart>
+            </div>
+    </div>
+
+
+      </div>
+      </div>
+    </div>
+  }
+  </div>
