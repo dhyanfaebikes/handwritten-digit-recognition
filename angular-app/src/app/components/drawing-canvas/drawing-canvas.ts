@@ -16,7 +16,7 @@ export class DrawingCanvas implements AfterViewInit {
   imageDataReady = output<ImageData>();
   canvasCleared = output<void>();
   
-  brushSize = signal(20);
+  brushSize = signal(10);
   brushColor = signal('#ffffff');
 
   ngAfterViewInit(): void {
@@ -29,7 +29,7 @@ export class DrawingCanvas implements AfterViewInit {
 
     // Set canvas properties - EXACT same as index.html lines 107-110
     this.ctx.strokeStyle = 'white';
-    this.ctx.lineWidth = 20;
+    this.ctx.lineWidth = 10;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
     
@@ -112,7 +112,7 @@ export class DrawingCanvas implements AfterViewInit {
     this.ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Reset canvas properties after clear
     this.ctx.strokeStyle = 'white';
-    this.ctx.lineWidth = 20;
+    this.ctx.lineWidth = 10;
     this.canvasCleared.emit();
   }
 

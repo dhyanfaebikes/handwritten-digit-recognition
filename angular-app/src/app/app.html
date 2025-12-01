@@ -1,7 +1,18 @@
 <div class="container">
   <header class="header">
-    <h1>MNIST CNN Classifier</h1>
+    <h1>MNIST Digit Classifier</h1>
     <div class="subtitle">Handwritten Digit Recognition</div>
+    <div class="model-selector">
+      <label for="modelSelect">Model:</label>
+      <select id="modelSelect" [ngModel]="selectedModel()" (ngModelChange)="selectedModel.set($event); onModelChange()" [disabled]="isModelLoading()">
+        @for (option of modelOptions; track option.value) {
+          <option [value]="option.value">
+            {{ option.label }} ({{ option.accuracy }})
+          </option>
+        }
+      </select>
+      <span class="current-model">Current: {{ getModelLabel(selectedModel()) }}</span>
+    </div>
   </header>
   
   @if (isModelLoading()) {
@@ -47,11 +58,22 @@
             </div>
           </div>
 
-          <!-- Tensor Flow Through Network -->
-          @if (currentPrediction() && tensorStats()) {
+          <!-- Model Architecture Visualization -->
+          @if (currentPrediction() && tensorStats() && selectedModel() !== 'logistic_regression') {
             <div class="panel-section">
-              <div class="section-title">Tensor Flow Through Network</div>
+              <div class="section-title">
+                @if (selectedModel() === 'cnn') {
+                  Tensor Flow Through Network
+                } @else if (selectedModel() === 'ann') {
+                  Neural Network Architecture
+                } @else if (selectedModel() === 'knn') {
+                  K-Nearest Neighbors Process
+                } @else if (selectedModel() === 'svm') {
+                  Support Vector Machine Process
+                }
+              </div>
               <div class="tensor-flow">
+                @if (selectedModel() === 'cnn') {
                 <div class="flow-step input-step">
                   <div class="flow-header">
                     <div class="flow-title">Input Image</div>
@@ -348,9 +370,263 @@
                         </div>
                       </div>
                     </div>
-                    <div class="flow-result">Predicted: {{ currentPrediction()!.digit }} ({{ (currentPrediction()!.confidence * 100).toFixed(1) }}%)</div>
+                    <div class="flow-result">
+                      Predicted: {{ currentPrediction()!.digit }} ({{ (currentPrediction()!.confidence * 100).toFixed(1) }}%)
+                    </div>
                   </div>
                 </div>
+                } @else if (selectedModel() === 'ann') {
+                  <div class="flow-step input-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Input Layer</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [784]</div>
+                      <div class="flow-explanation">784 input neurons (flattened image)</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Neurons:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.input.count | number }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Dense Layer 1</div>
+                  </div>
+                  <div class="flow-step dense-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Hidden Layer 1</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [128]</div>
+                      <div class="flow-explanation">128 neurons with ReLU activation</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Neurons:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.hidden1?.count || 128 | number }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Top1</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.hidden1?.top1 || 0, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Dense Layer 2</div>
+                  </div>
+                  <div class="flow-step dense-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Hidden Layer 2</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [64]</div>
+                      <div class="flow-explanation">64 neurons with ReLU activation</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Neurons:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.hidden2?.count || 64 | number }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Top1</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.hidden2?.top1 || 0, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Output Layer</div>
+                  </div>
+                  <div class="flow-step output-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Output Layer</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [10]</div>
+                      <div class="flow-explanation">10 output neurons with softmax</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Classes:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.output.count }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Top1</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.output.top1, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flow-result">
+                        Predicted: {{ currentPrediction()!.digit }} ({{ (currentPrediction()!.confidence * 100).toFixed(1) }}%)
+                      </div>
+                    </div>
+                  </div>
+                } @else if (selectedModel() === 'knn') {
+                  <div class="flow-step input-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Input Image</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [784]</div>
+                      <div class="flow-explanation">784 pixel features</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Features:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.input.count | number }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Distance Calculation</div>
+                  </div>
+                  <div class="flow-step dense-step">
+                    <div class="flow-header">
+                      <div class="flow-title">K Nearest Neighbors</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [5]</div>
+                      <div class="flow-explanation">5 closest training samples (k=5)</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Neighbors:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.distances?.count || 5 }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Min Distance</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.distances?.min || 0, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Voting</div>
+                  </div>
+                  <div class="flow-step output-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Prediction</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [10]</div>
+                      <div class="flow-explanation">Vote counts per class</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Classes:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.output.count }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Top1</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.output.top1, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flow-result">
+                        Predicted: {{ currentPrediction()!.digit }} ({{ (currentPrediction()!.confidence * 100).toFixed(1) }}%)
+                      </div>
+                    </div>
+                  </div>
+                } @else if (selectedModel() === 'svm') {
+                  <div class="flow-step input-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Input Features</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [784]</div>
+                      <div class="flow-explanation">784 input features</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Features:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.input.count | number }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Kernel Transformation</div>
+                  </div>
+                  <div class="flow-step dense-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Feature Space</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [100]</div>
+                      <div class="flow-explanation">RBF kernel transformation</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Dimensions:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.features?.count || 100 | number }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Decision Function</div>
+                  </div>
+                  <div class="flow-step dense-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Decision Values</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [10]</div>
+                      <div class="flow-explanation">Distance to hyperplane per class</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Classes:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.decision?.count || 10 }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Max</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.decision?.max || 0, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flow-connector">
+                    <div class="connector-line"></div>
+                    <div class="connector-label">Probability</div>
+                  </div>
+                  <div class="flow-step output-step">
+                    <div class="flow-header">
+                      <div class="flow-title">Output Probabilities</div>
+                    </div>
+                    <div class="flow-details">
+                      <div class="flow-shape">Shape: [10]</div>
+                      <div class="flow-explanation">Class probabilities</div>
+                      <div class="flow-stats">
+                        <div class="static-metrics">
+                          <span class="metric-label">Classes:</span>
+                          <span class="metric-value-static">{{ tensorStats()!.output.count }}</span>
+                        </div>
+                        <div class="dynamic-metrics">
+                          <div class="metric-item featured">
+                            <div class="metric-label-small">Top1</div>
+                            <div class="metric-value-large">{{ formatDecimal(tensorStats()!.output.top1, 4) }}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="flow-result">
+                        Predicted: {{ currentPrediction()!.digit }} ({{ (currentPrediction()!.confidence * 100).toFixed(1) }}%)
+                      </div>
+                    </div>
+                  </div>
+                }
               </div>
             </div>
           }
@@ -384,8 +660,8 @@
         <div class="right-panel">
           @if (currentPrediction()) {
             <div class="panel-section prediction-display">
-              <div class="predicted-digit">{{ currentPrediction()!.digit }}</div>
-              <div class="prediction-label">PREDICTED CLASS</div>
+              <div class="predicted-digit">{{ getPredictionDisplay() }}</div>
+              <div class="prediction-label">{{ getPredictionLabel() }}</div>
               <div class="confidence-bar">
                 <div class="confidence-fill" [style.width.%]="currentPrediction()!.confidence * 100"></div>
                 <div class="confidence-text">{{ (currentPrediction()!.confidence * 100).toFixed(1) }}%</div>
@@ -412,7 +688,7 @@
           <div class="panel-section chart-section">
             <div class="section-title">Softmax Output Distribution</div>
             <div class="chart-container">
-              <app-confidence-chart [probabilities]="predictionProbabilities"></app-confidence-chart>
+              <app-confidence-chart [probabilities]="predictionProbabilities" [modelType]="selectedModel()"></app-confidence-chart>
             </div>
     </div>
 

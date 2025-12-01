@@ -14,13 +14,19 @@ export class ConfidenceChart implements AfterViewInit {
   @ViewChild('chartCanvas', { static: false }) chartCanvas!: ElementRef<HTMLCanvasElement>;
   
   probabilities = input<number[]>([]);
+  modelType = input<string>('cnn');
   private chart: Chart | null = null;
 
   constructor() {
     effect(() => {
       const probs = this.probabilities();
+      const model = this.modelType();
       if (this.chart && probs.length > 0) {
         this.updateChart(probs);
+        if (this.chart.options.plugins?.title) {
+          this.chart.options.plugins.title.text = this.getChartTitle();
+          this.chart.update('none');
+        }
       }
     });
   }
@@ -77,7 +83,7 @@ export class ConfidenceChart implements AfterViewInit {
         plugins: {
           title: {
             display: true,
-            text: 'MNIST CNN Prediction'
+            text: this.getChartTitle()
           }
         }
       }
@@ -87,10 +93,25 @@ export class ConfidenceChart implements AfterViewInit {
     console.log('Chart initialized successfully');
   }
 
+  private getChartTitle(): string {
+    const model = this.modelType();
+    const titles: { [key: string]: string } = {
+      'cnn': 'CNN Prediction',
+      'ann': 'ANN Prediction',
+      'svm': 'SVM Prediction',
+      'knn': 'KNN Prediction',
+      'logistic_regression': 'Logistic Regression Prediction'
+    };
+    return titles[model] || 'Model Prediction';
+  }
+
   private updateChart(probabilities: number[]): void {
     if (!this.chart || probabilities.length !== 10) return;
 
     this.chart.data.datasets[0].data = probabilities;
+    if (this.chart.options.plugins?.title) {
+      this.chart.options.plugins.title.text = this.getChartTitle();
+    }
     this.chart.update('active');
   }
 }

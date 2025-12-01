@@ -1,14 +1,16 @@
 import { Component, OnInit, signal, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { DrawingCanvas } from './components/drawing-canvas/drawing-canvas';
 import { ConfidenceChart } from './components/confidence-chart/confidence-chart';
-import { Model, PredictionResult } from './services/model';
+import { Model, PredictionResult, ModelType } from './services/model';
 import * as tf from '@tensorflow/tfjs';
 
 @Component({
   selector: 'app-root',
   imports: [
     CommonModule,
+    FormsModule,
     DrawingCanvas,
     ConfidenceChart
   ],
@@ -25,13 +27,62 @@ export class App implements OnInit, AfterViewInit {
   tensorStats = signal<any>(null);
   isProcessing = signal(false);
   inferenceTime = signal(0);
+  selectedModel = signal<ModelType>('cnn');
+  availableModels = signal<{ [key: string]: boolean }>({});
+  
+  modelOptions: { value: ModelType; label: string; accuracy: string }[] = [
+    { value: 'cnn', label: 'CNN', accuracy: '~100%' },
+    { value: 'ann', label: 'ANN', accuracy: '~80%' },
+    { value: 'svm', label: 'SVM', accuracy: '~80%' },
+    { value: 'knn', label: 'KNN', accuracy: '~80%' },
+    { value: 'logistic_regression', label: 'Logistic Regression', accuracy: '~50%' },
+  ];
 
   constructor(
     private modelService: Model
   ) {}
 
-  ngOnInit(): void {
-    this.loadModel();
+  async ngOnInit(): Promise<void> {
+    await this.checkAvailableModels();
+    await this.loadModel();
+  }
+  
+  async checkAvailableModels(): Promise<void> {
+    const models = await this.modelService.getAvailableModels();
+    this.availableModels.set(models);
+  }
+  
+  async onModelChange(): Promise<void> {
+    const modelType = this.selectedModel();
+    this.modelService.setModelType(modelType);
+    
+    // Clear canvas when changing models
+    if (this.drawingCanvas) {
+      this.drawingCanvas.clear();
+    }
+    
+    // Clear preprocessed canvas
+    if (this.preprocessedCanvas) {
+      const canvas = this.preprocessedCanvas.nativeElement;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+    
+    this.currentPrediction.set(null);
+    this.tensorStats.set(null);
+    this.inferenceTime.set(0);
+    this.resultText.set(`Model: ${this.getModelLabel(modelType)}. Draw a digit and click Infer.`);
+  }
+  
+  getModelLabel(modelType: ModelType): string {
+    const option = this.modelOptions.find(opt => opt.value === modelType);
+    return option?.label || modelType;
+  }
+  
+  isModelAvailable(modelType: ModelType): boolean {
+    return true;
   }
 
   ngAfterViewInit(): void {
@@ -80,13 +131,9 @@ export class App implements OnInit, AfterViewInit {
           this.tensorStats.set(result.intermediateOutputs);
           this.inferenceTime.set(elapsed);
           
-          // Debug logging
-          console.log('Tensor stats set:', result.intermediateOutputs);
-          console.log('Has tensorStats:', !!this.tensorStats());
-          console.log('Has currentPrediction:', !!this.currentPrediction());
-          
+          const predictedDigit = result.prediction.digit;
           const confidence = (result.prediction.confidence * 100).toFixed(1);
-          this.resultText.set(`Predicting you draw ${result.prediction.digit} with ${confidence}% confidence`);
+          this.resultText.set(`Predicting you draw ${predictedDigit} with ${confidence}% confidence`);
         } catch (error: any) {
           console.error('Prediction error:', error);
           this.resultText.set(`Error: ${error.message}`);
@@ -122,6 +169,20 @@ export class App implements OnInit, AfterViewInit {
 
   get predictionProbabilities(): number[] {
     return this.currentPrediction()?.probabilities || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  }
+
+  isPredictionValid(): boolean {
+    return this.currentPrediction() !== null;
+  }
+
+  getPredictionDisplay(): string {
+    const prediction = this.currentPrediction();
+    if (!prediction) return '';
+    return prediction.digit.toString();
+  }
+
+  getPredictionLabel(): string {
+    return 'PREDICTED CLASS';
   }
 
   // Helper function to format decimal numbers
