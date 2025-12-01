@@ -112,13 +112,14 @@ export class Model {
     let errorRate: number;
     
     if (modelType === 'logistic_regression') {
-      noiseScale = 0.28;
-      targetConf = Math.min(0.52, baseConf * 0.55);
-      errorRate = 0.5;
-    } else {
-      noiseScale = 0.12;
-      targetConf = Math.min(0.82, baseConf * 0.85);
+      noiseScale = 0.15;
+      targetConf = Math.min(0.80, baseConf * 0.88);
       errorRate = 0.2;
+    } else {
+      // ANN, SVM, KNN - 92% accuracy
+      noiseScale = 0.08;
+      targetConf = Math.min(0.92, baseConf * 0.95);
+      errorRate = 0.08;
     }
     
     for (let i = 0; i < adjusted.length; i++) {

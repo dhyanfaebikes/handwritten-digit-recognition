@@ -7,7 +7,7 @@
       <select id="modelSelect" [ngModel]="selectedModel()" (ngModelChange)="selectedModel.set($event); onModelChange()" [disabled]="isModelLoading()">
         @for (option of modelOptions; track option.value) {
           <option [value]="option.value">
-            {{ option.label }} ({{ option.accuracy }})
+            {{ option.label }}
           </option>
         }
       </select>

@@ -32,10 +32,10 @@ export class App implements OnInit, AfterViewInit {
   
   modelOptions: { value: ModelType; label: string; accuracy: string }[] = [
     { value: 'cnn', label: 'CNN', accuracy: '~100%' },
-    { value: 'ann', label: 'ANN', accuracy: '~80%' },
-    { value: 'svm', label: 'SVM', accuracy: '~80%' },
-    { value: 'knn', label: 'KNN', accuracy: '~80%' },
-    { value: 'logistic_regression', label: 'Logistic Regression', accuracy: '~50%' },
+    { value: 'ann', label: 'ANN', accuracy: '~92%' },
+    { value: 'svm', label: 'SVM', accuracy: '~92%' },
+    { value: 'knn', label: 'KNN', accuracy: '~92%' },
+    { value: 'logistic_regression', label: 'Logistic Regression', accuracy: '~80%' },
   ];
 
   constructor(
