@@ -13,6 +13,9 @@
       </select>
       <span class="current-model">Current: {{ getModelLabel(selectedModel()) }}</span>
     </div>
+    <div class="header-actions">
+      <a class="btn btn-primary" routerLink="/comparison">Check Comparison</a>
+    </div>
   </header>
   
   @if (isModelLoading()) {
@@ -690,11 +693,9 @@
             <div class="chart-container">
               <app-confidence-chart [probabilities]="predictionProbabilities" [modelType]="selectedModel()"></app-confidence-chart>
             </div>
-    </div>
-
-
-      </div>
+          </div>
+        </div>
       </div>
     </div>
   }
-  </div>
+</div>

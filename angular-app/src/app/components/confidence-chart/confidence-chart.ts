@@ -54,8 +54,8 @@ export class ConfidenceChart implements AfterViewInit {
         datasets: [{
           label: 'Prediction Confidence',
           data: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(6, 182, 212, 0.35)',
+          borderColor: 'rgba(6, 182, 212, 0.95)',
           borderWidth: 1
         }]
       },
@@ -64,26 +64,34 @@ export class ConfidenceChart implements AfterViewInit {
         animation: {
           duration: 500
         },
+        color: '#eaf0ff',
         scales: {
           y: {
             beginAtZero: true,
             max: 1.0,
             title: {
               display: true,
-              text: 'Confidence'
-            }
+              text: 'Confidence',
+              color: '#eaf0ff'
+            },
+            ticks: { color: '#eaf0ff' },
+            grid: { color: 'rgba(234, 240, 255, 0.14)' }
           },
           x: {
             title: {
               display: true,
-              text: 'Digit'
-            }
+              text: 'Digit',
+              color: '#eaf0ff'
+            },
+            ticks: { color: '#eaf0ff' },
+            grid: { color: 'rgba(234, 240, 255, 0.10)' }
           }
         },
         plugins: {
           title: {
             display: true,
-            text: this.getChartTitle()
+            text: this.getChartTitle(),
+            color: '#eaf0ff'
           }
         }
       }

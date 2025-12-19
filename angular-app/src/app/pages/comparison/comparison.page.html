@@ -1,0 +1,62 @@
+<div class="container">
+  <header class="header">
+    <h1>Check Comparison</h1>
+    <div class="subtitle">Compare all models at once (no dropdown, one click)</div>
+
+    <div class="header-actions">
+      <a class="btn btn-secondary" routerLink="/">Back</a>
+      <button class="btn btn-secondary" (click)="handleClear()" [disabled]="isComparing() || isModelLoading()">Clear</button>
+      <button class="btn btn-primary" (click)="handleCompare()" [disabled]="isComparing() || isModelLoading()">Compare</button>
+    </div>
+  </header>
+
+  @if (isModelLoading()) {
+    <div class="loading">
+      <div class="loader"></div>
+      <div>Preparing model...</div>
+      <div class="loader-text">Charts will appear as soon as the model is ready.</div>
+    </div>
+  }
+
+  <div class="app">
+    <div class="main-grid">
+      <div class="left-panel">
+        <div class="panel-section">
+          <div class="section-title">Input</div>
+          <div class="canvas-wrapper">
+            <app-drawing-canvas #drawingCanvas></app-drawing-canvas>
+          </div>
+          <div class="controls">
+            <button class="btn btn-secondary" (click)="handleClear()" [disabled]="isComparing() || isModelLoading()">Clear</button>
+            <button class="btn btn-primary" (click)="handleCompare()" [disabled]="isComparing() || isModelLoading()">Compare All</button>
+          </div>
+
+          @if (error()) {
+            <div class="error">{{ error() }}</div>
+          }
+        </div>
+      </div>
+
+      <div class="right-panel">
+        @if (isComparing()) {
+          <div class="panel-section">
+            <div class="section-title">Running comparison...</div>
+            <div class="loading-inline">
+              <div class="loader small"></div>
+              <div>Computing predictions for all models</div>
+            </div>
+          </div>
+        }
+
+        <div class="panel-section chart-section">
+          <div class="section-title">Top prediction confidence by model</div>
+          <div class="chart-container">
+            <canvas #topConfidenceCanvas></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+

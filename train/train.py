@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 MNIST CNN Training Script
-Training pipeline for handwritten digit recognition using convolutional neural networks.
+Training pipeline for handwritten digit recognition .
 """
 import os
 import random
