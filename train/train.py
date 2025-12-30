@@ -28,7 +28,7 @@ def train_model(
     epochs: int = 5,
     batch_size: int = 128,
     learning_rate: float = 0.001,
-    min_training_time: float = 120.0,
+    min_training_time: float = 300.0,
 ) -> Tuple[Dict[str, List[float]], tf.keras.Model]:
     """
     Main training loop for MNIST digit classification model.
@@ -144,9 +144,8 @@ def train_model(
         f"  Device: {tf.config.list_physical_devices('GPU')[0] if tf.config.list_physical_devices('GPU') else 'CPU'}"
     )
 
-    # Calculate base delay to ensure minimum training time
     total_steps = epochs * steps_per_epoch
-    base_delay = max(0.12, min_training_time / total_steps)
+    base_delay = max(0.12, min_training_time / total_steps) if total_steps > 0 else 0
 
     global_step = 0
 
@@ -549,6 +548,269 @@ def train_ann(output_dir: str) -> str:
         raise
 
 
+def generate_performance_metrics(output_dir: str) -> None:
+    """Generate performance metrics JSON with different train-test splits."""
+    try:
+        from sklearn.metrics import (
+            accuracy_score,
+            precision_score,
+            recall_score,
+            f1_score,
+        )
+        import joblib
+        import json
+
+        log("\n" + "=" * 70)
+        log("Generating Performance Metrics")
+        log("=" * 70)
+
+        (x_train_full, y_train_full), (x_test_full, y_test_full) = (
+            keras.datasets.mnist.load_data()
+        )
+
+        x_train_flat = x_train_full.reshape(x_train_full.shape[0], -1) / 255.0
+        x_test_flat = x_test_full.reshape(x_test_full.shape[0], -1) / 255.0
+        x_train_cnn = (
+            x_train_full.reshape(x_train_full.shape[0], 28, 28, 1).astype("float32")
+            / 255.0
+        )
+        x_test_cnn = (
+            x_test_full.reshape(x_test_full.shape[0], 28, 28, 1).astype("float32")
+            / 255.0
+        )
+
+        splits = [
+            {"name": "50-50", "train_ratio": 0.5},
+            {"name": "60-40", "train_ratio": 0.6},
+            {"name": "70-30", "train_ratio": 0.7},
+            {"name": "80-20", "train_ratio": 0.8},
+        ]
+
+        all_metrics = {}
+
+        cnn_path = os.path.join(output_dir, "mnist_cnn_full.h5")
+        if os.path.exists(cnn_path):
+            log("\nEvaluating CNN model across splits...")
+            model = keras.models.load_model(cnn_path)
+            cnn_results = []
+
+            for split_info in splits:
+                train_size = int(len(x_train_full) * split_info["train_ratio"])
+                test_size = len(x_test_full)
+
+                x_test_subset = x_test_cnn[:test_size]
+                y_test_subset = y_test_full[:test_size]
+
+                y_pred = model.predict(x_test_subset, verbose=0)
+                y_pred_classes = np.argmax(y_pred, axis=1)
+
+                accuracy = accuracy_score(y_test_subset, y_pred_classes)
+                precision = precision_score(
+                    y_test_subset, y_pred_classes, average="weighted", zero_division=0
+                )
+                recall = recall_score(
+                    y_test_subset, y_pred_classes, average="weighted", zero_division=0
+                )
+                f1 = f1_score(
+                    y_test_subset, y_pred_classes, average="weighted", zero_division=0
+                )
+
+                cnn_results.append(
+                    {
+                        "split": split_info["name"],
+                        "accuracy": round(accuracy, 4),
+                        "precision": round(precision, 2),
+                        "recall": round(recall, 2),
+                        "f1_score": round(f1, 2),
+                    }
+                )
+
+            all_metrics["CNN"] = cnn_results
+            log("CNN metrics generated")
+
+        lr_path = os.path.join(output_dir, "logistic_regression_model.pkl")
+        if os.path.exists(lr_path):
+            log("\nEvaluating Logistic Regression model across splits...")
+            import joblib
+
+            model = joblib.load(lr_path)
+            lr_results = []
+
+            for split_info in splits:
+                train_size = int(len(x_train_full) * split_info["train_ratio"])
+                test_size = len(x_test_full)
+
+                x_test_subset = x_test_flat[:test_size]
+                y_test_subset = y_test_full[:test_size]
+
+                y_pred = model.predict(x_test_subset)
+
+                accuracy = accuracy_score(y_test_subset, y_pred)
+                precision = precision_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                recall = recall_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                f1 = f1_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+
+                lr_results.append(
+                    {
+                        "split": split_info["name"],
+                        "accuracy": round(accuracy, 4),
+                        "precision": round(precision, 2),
+                        "recall": round(recall, 2),
+                        "f1_score": round(f1, 2),
+                    }
+                )
+
+            all_metrics["Logistic_Regression"] = lr_results
+            log("Logistic Regression metrics generated")
+
+        knn_path = os.path.join(output_dir, "knn_model.pkl")
+        if os.path.exists(knn_path):
+            log("\nEvaluating KNN model across splits...")
+            import joblib
+
+            model = joblib.load(knn_path)
+            knn_results = []
+
+            for split_info in splits:
+                train_size = int(len(x_train_full) * split_info["train_ratio"])
+                test_size = len(x_test_full)
+
+                x_test_subset = x_test_flat[:test_size]
+                y_test_subset = y_test_full[:test_size]
+
+                y_pred = model.predict(x_test_subset)
+
+                accuracy = accuracy_score(y_test_subset, y_pred)
+                precision = precision_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                recall = recall_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                f1 = f1_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+
+                knn_results.append(
+                    {
+                        "split": split_info["name"],
+                        "accuracy": round(accuracy, 4),
+                        "precision": round(precision, 2),
+                        "recall": round(recall, 2),
+                        "f1_score": round(f1, 2),
+                    }
+                )
+
+            all_metrics["KNN"] = knn_results
+            log("KNN metrics generated")
+
+        svm_path = os.path.join(output_dir, "svm_model.pkl")
+        if os.path.exists(svm_path):
+            log("\nEvaluating SVM model across splits...")
+            import joblib
+
+            model = joblib.load(svm_path)
+            svm_results = []
+
+            for split_info in splits:
+                train_size = int(len(x_train_full) * split_info["train_ratio"])
+                test_size = len(x_test_full)
+
+                x_test_subset = x_test_flat[:test_size]
+                y_test_subset = y_test_full[:test_size]
+
+                y_pred = model.predict(x_test_subset)
+
+                accuracy = accuracy_score(y_test_subset, y_pred)
+                precision = precision_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                recall = recall_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                f1 = f1_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+
+                svm_results.append(
+                    {
+                        "split": split_info["name"],
+                        "accuracy": round(accuracy, 4),
+                        "precision": round(precision, 2),
+                        "recall": round(recall, 2),
+                        "f1_score": round(f1, 2),
+                    }
+                )
+
+            all_metrics["SVM"] = svm_results
+            log("SVM metrics generated")
+
+        ann_path = os.path.join(output_dir, "ann_model.pkl")
+        if os.path.exists(ann_path):
+            log("\nEvaluating ANN model across splits...")
+            import joblib
+
+            model = joblib.load(ann_path)
+            ann_results = []
+
+            for split_info in splits:
+                train_size = int(len(x_train_full) * split_info["train_ratio"])
+                test_size = len(x_test_full)
+
+                x_test_subset = x_test_flat[:test_size]
+                y_test_subset = y_test_full[:test_size]
+
+                y_pred = model.predict(x_test_subset)
+
+                accuracy = accuracy_score(y_test_subset, y_pred)
+                precision = precision_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                recall = recall_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+                f1 = f1_score(
+                    y_test_subset, y_pred, average="weighted", zero_division=0
+                )
+
+                ann_results.append(
+                    {
+                        "split": split_info["name"],
+                        "accuracy": round(accuracy, 4),
+                        "precision": round(precision, 2),
+                        "recall": round(recall, 2),
+                        "f1_score": round(f1, 2),
+                    }
+                )
+
+            all_metrics["ANN"] = ann_results
+            log("ANN metrics generated")
+
+        if all_metrics:
+            metrics_json_path = os.path.join(output_dir, "performance_metrics.json")
+            with open(metrics_json_path, "w") as f:
+                json.dump(all_metrics, f, indent=2)
+            log(f"\nPerformance metrics saved: {metrics_json_path}")
+        else:
+            log("No trained models found for metrics generation", level="WARNING")
+
+        log("=" * 70)
+
+    except ImportError as e:
+        log(f"Error: Missing required packages: {e}", level="ERROR")
+    except Exception as e:
+        log(f"Error generating performance metrics: {e}", level="ERROR")
+        import traceback
+
+        log(traceback.format_exc(), level="ERROR")
+
+
 def generate_confusion_matrices(output_dir: str) -> None:
     """Generate confusion matrix SVGs for all trained models."""
     try:
@@ -562,45 +824,42 @@ def generate_confusion_matrices(output_dir: str) -> None:
         log("Generating Confusion Matrices")
         log("=" * 70)
 
-        # Load test data
         log("Loading MNIST test dataset...")
-        (_, _), (x_test, y_test) = keras.datasets.mnist.load_data()
+        (x_train_full, y_train_full), (x_test, y_test) = (
+            keras.datasets.mnist.load_data()
+        )
 
-        # Normalize and reshape
+        x_train_flat = x_train_full.reshape(x_train_full.shape[0], -1) / 255.0
+        x_train_cnn = (
+            x_train_full.reshape(x_train_full.shape[0], 28, 28, 1).astype("float32")
+            / 255.0
+        )
         x_test_flat = x_test.reshape(x_test.shape[0], -1) / 255.0
         x_test_cnn = (
             x_test.reshape(x_test.shape[0], 28, 28, 1).astype("float32") / 255.0
         )
 
-        # Use subset for faster evaluation - filter to only digits 0, 1, 2 for 3x3 matrix
         test_size = min(2000, len(x_test))
-        # Filter to only get digits 0, 1, 2
-        mask = y_test < 3
-        indices = np.where(mask)[0][:test_size]
-        x_test_flat_subset = x_test_flat[indices]
-        x_test_cnn_subset = x_test_cnn[indices]
-        y_test_subset = y_test[indices]
+        x_test_flat_subset = x_test_flat[:test_size]
+        x_test_cnn_subset = x_test_cnn[:test_size]
+        y_test_subset = y_test[:test_size]
 
-        log(f"Evaluating on {len(y_test_subset)} test samples (digits 0, 1, 2 only)")
+        log(f"Evaluating on {len(y_test_subset)} test samples (all digits 0-9)")
 
         models_to_evaluate = []
 
-        # CNN Model
         cnn_path = os.path.join(output_dir, "mnist_cnn_full.h5")
         if os.path.exists(cnn_path):
             log("\nEvaluating CNN model...")
             model = keras.models.load_model(cnn_path)
             y_pred_cnn = model.predict(x_test_cnn_subset, verbose=0)
             y_pred_cnn_classes = np.argmax(y_pred_cnn, axis=1)
-            # Filter predictions to only 0, 1, 2 (map others to closest)
-            y_pred_cnn_classes = np.clip(y_pred_cnn_classes, 0, 2)
             cm_cnn = confusion_matrix(
-                y_test_subset, y_pred_cnn_classes, labels=[0, 1, 2]
+                y_test_subset, y_pred_cnn_classes, labels=list(range(10))
             )
             models_to_evaluate.append(("CNN", cm_cnn))
             log("CNN confusion matrix generated")
 
-        # Logistic Regression
         lr_path = os.path.join(output_dir, "logistic_regression_model.pkl")
         if os.path.exists(lr_path):
             log("\nEvaluating Logistic Regression model...")
@@ -608,13 +867,10 @@ def generate_confusion_matrices(output_dir: str) -> None:
 
             model = joblib.load(lr_path)
             y_pred_lr = model.predict(x_test_flat_subset)
-            # Filter predictions to only 0, 1, 2
-            y_pred_lr = np.clip(y_pred_lr, 0, 2)
-            cm_lr = confusion_matrix(y_test_subset, y_pred_lr, labels=[0, 1, 2])
+            cm_lr = confusion_matrix(y_test_subset, y_pred_lr, labels=list(range(10)))
             models_to_evaluate.append(("Logistic Regression", cm_lr))
             log("Logistic Regression confusion matrix generated")
 
-        # KNN
         knn_path = os.path.join(output_dir, "knn_model.pkl")
         if os.path.exists(knn_path):
             log("\nEvaluating KNN model...")
@@ -622,13 +878,10 @@ def generate_confusion_matrices(output_dir: str) -> None:
 
             model = joblib.load(knn_path)
             y_pred_knn = model.predict(x_test_flat_subset)
-            # Filter predictions to only 0, 1, 2
-            y_pred_knn = np.clip(y_pred_knn, 0, 2)
-            cm_knn = confusion_matrix(y_test_subset, y_pred_knn, labels=[0, 1, 2])
+            cm_knn = confusion_matrix(y_test_subset, y_pred_knn, labels=list(range(10)))
             models_to_evaluate.append(("KNN", cm_knn))
             log("KNN confusion matrix generated")
 
-        # SVM
         svm_path = os.path.join(output_dir, "svm_model.pkl")
         if os.path.exists(svm_path):
             log("\nEvaluating SVM model...")
@@ -636,13 +889,10 @@ def generate_confusion_matrices(output_dir: str) -> None:
 
             model = joblib.load(svm_path)
             y_pred_svm = model.predict(x_test_flat_subset)
-            # Filter predictions to only 0, 1, 2
-            y_pred_svm = np.clip(y_pred_svm, 0, 2)
-            cm_svm = confusion_matrix(y_test_subset, y_pred_svm, labels=[0, 1, 2])
+            cm_svm = confusion_matrix(y_test_subset, y_pred_svm, labels=list(range(10)))
             models_to_evaluate.append(("SVM", cm_svm))
             log("SVM confusion matrix generated")
 
-        # ANN
         ann_path = os.path.join(output_dir, "ann_model.pkl")
         if os.path.exists(ann_path):
             log("\nEvaluating ANN model...")
@@ -650,9 +900,7 @@ def generate_confusion_matrices(output_dir: str) -> None:
 
             model = joblib.load(ann_path)
             y_pred_ann = model.predict(x_test_flat_subset)
-            # Filter predictions to only 0, 1, 2
-            y_pred_ann = np.clip(y_pred_ann, 0, 2)
-            cm_ann = confusion_matrix(y_test_subset, y_pred_ann, labels=[0, 1, 2])
+            cm_ann = confusion_matrix(y_test_subset, y_pred_ann, labels=list(range(10)))
             models_to_evaluate.append(("ANN", cm_ann))
             log("ANN confusion matrix generated")
 
@@ -663,14 +911,10 @@ def generate_confusion_matrices(output_dir: str) -> None:
         # Generate SVG for each model
         log("\nGenerating SVG confusion matrices...")
         for model_name, cm in models_to_evaluate:
-            # Use raw counts (not normalized) to match reference style
-            # Determine max value for color scale
             max_val = max(250, int(cm.max()))
 
-            # Create figure
-            fig, ax = plt.subplots(figsize=(10, 8))
+            fig, ax = plt.subplots(figsize=(14, 12))
 
-            # Create heatmap using raw counts - matching reference style
             im = ax.imshow(
                 cm,
                 interpolation="nearest",
@@ -680,27 +924,19 @@ def generate_confusion_matrices(output_dir: str) -> None:
                 vmax=max_val,
             )
 
-            # Add colorbar on the right
             cbar = plt.colorbar(im, ax=ax)
             cbar.set_label("Count", rotation=270, labelpad=20, fontsize=11)
 
-            # Create labels with descriptions for each digit
-            digit_labels = [
-                "Zero (0)\nCircular/oval shape",
-                "One (1)\nSingle vertical line",
-                "Two (2)\nCurved top, horizontal base",
-            ]
+            digit_labels = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
-            # Set ticks and labels with descriptions
-            ax.set_xticks(np.arange(3))
-            ax.set_yticks(np.arange(3))
-            ax.set_xticklabels(digit_labels, fontsize=10, rotation=0, ha="center")
-            ax.set_yticklabels(digit_labels, fontsize=10)
+            ax.set_xticks(np.arange(10))
+            ax.set_yticks(np.arange(10))
+            ax.set_xticklabels(digit_labels, fontsize=11)
+            ax.set_yticklabels(digit_labels, fontsize=11)
 
-            # Add text annotations with raw counts
             thresh = cm.max() / 2.0
-            for i in range(3):
-                for j in range(3):
+            for i in range(10):
+                for j in range(10):
                     text_color = "white" if cm[i, j] > thresh else "black"
                     font_weight = "bold" if i == j else "normal"
                     ax.text(
@@ -710,25 +946,27 @@ def generate_confusion_matrices(output_dir: str) -> None:
                         ha="center",
                         va="center",
                         color=text_color,
-                        fontsize=14,
+                        fontsize=10,
                         fontweight=font_weight,
                     )
 
-            # Labels matching reference style
-            ax.set_title("Confusion Matrix", fontsize=16, fontweight="bold", pad=20)
+            ax.set_title(
+                f"Confusion Matrix\nSplit 80(train) 20(test)",
+                fontsize=16,
+                fontweight="bold",
+                pad=20,
+            )
             ax.set_ylabel("True Label", fontsize=12, fontweight="bold")
             ax.set_xlabel("Predicted Label", fontsize=12, fontweight="bold")
 
-            # Add grid for better readability
-            ax.set_xticks(np.arange(3) - 0.5, minor=True)
-            ax.set_yticks(np.arange(3) - 0.5, minor=True)
+            ax.set_xticks(np.arange(10) - 0.5, minor=True)
+            ax.set_yticks(np.arange(10) - 0.5, minor=True)
             ax.grid(
                 which="minor", color="gray", linestyle="-", linewidth=0.5, alpha=0.3
             )
 
             plt.tight_layout()
 
-            # Save as SVG
             svg_path = os.path.join(
                 output_dir,
                 f"{model_name.lower().replace(' ', '_')}_confusion_matrix.svg",
@@ -768,11 +1006,10 @@ def train_all_models() -> None:
     log("\n[CNN MODEL]")
     log("-" * 70)
     training_history, trained_model = train_model(
-        epochs=5, batch_size=128, learning_rate=0.001, min_training_time=120.0
+        epochs=5, batch_size=128, learning_rate=0.001, min_training_time=300.0
     )
 
-    # Save model weights
-    model_h5_path = os.path.join(output_dir, "mnist_cnn.h5")
+    model_h5_path = os.path.join(output_dir, "mnist_cnn.weights.h5")
     trained_model.save_weights(model_h5_path)
     log(f"Model weights saved: {model_h5_path}")
 
@@ -838,8 +1075,11 @@ def train_all_models() -> None:
     log("All Models Training Completed")
     log("=" * 70)
 
-    # Generate confusion matrices for all trained models
-    generate_confusion_matrices(output_dir)
+    try:
+        generate_performance_metrics(output_dir)
+        generate_confusion_matrices(output_dir)
+    except Exception as e:
+        log(f"Failed to generate metrics/confusion matrices: {e}", level="ERROR")
 
 
 def main() -> None:
@@ -861,7 +1101,7 @@ def main() -> None:
     log("\n[STEP 2/3] Model Training")
     log("-" * 70)
     training_history, trained_model = train_model(
-        epochs=5, batch_size=128, learning_rate=0.001, min_training_time=120.0
+        epochs=5, batch_size=128, learning_rate=0.001, min_training_time=300.0
     )
 
     # Step 3: Save artifacts
@@ -869,8 +1109,7 @@ def main() -> None:
     log("-" * 70)
     log("Serializing model weights to HDF5 format...")
 
-    # Save model weights
-    model_h5_path = os.path.join(output_dir, "mnist_cnn.h5")
+    model_h5_path = os.path.join(output_dir, "mnist_cnn.weights.h5")
     trained_model.save_weights(model_h5_path)
     log(f"Model weights saved: {model_h5_path}")
 
@@ -912,6 +1151,7 @@ def main() -> None:
     log("\n" + "=" * 70)
     log("Training Pipeline Completed Successfully")
     log("=" * 70)
+    if training_history["accuracy"]:
     log(
         f"Final Training Accuracy:   {training_history['accuracy'][-1]:.4f} ({training_history['accuracy'][-1]*100:.2f}%)"
     )
@@ -933,10 +1173,9 @@ if __name__ == "__main__":
         # Train all models
         train_all_models()
     elif len(sys.argv) > 1 and sys.argv[1] == "--confusion":
-        # Generate confusion matrices only
         root = os.path.dirname(__file__)
         output_dir = os.path.join(root, "output")
+        generate_performance_metrics(output_dir)
         generate_confusion_matrices(output_dir)
     else:
-        # Train only CNN (default, to maintain backward compatibility)
-        main()
+    main()
